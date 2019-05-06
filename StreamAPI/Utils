@@ -1,0 +1,145 @@
+package streamAPI;
+
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+class Utils {
+
+    private static final Integer beginYear = 2013;
+    private static File file;
+    static int count = 0;
+
+    /*
+    не совсем понял, то подразмевалось под заданием "одновременно читать файл и писать его данные в новый файл
+    сделал вот так, по-другому не совсем понял как использовать streamAPI
+     */
+    static ArrayList<String> readFile(String pathToFile) {
+        PrintWriter writer;
+        ArrayList<String> src;
+        try {
+            writer = new PrintWriter(new File("output.txt"));
+            File dam = new File("dam.dam");
+            //ждем пока не появится маркерный файл
+            while (!dam.exists()) {
+                count++;
+                if (count >= 10) {
+                    dam.createNewFile();
+                    file = dam;
+                }
+            }
+            Supplier<Stream<String>> supplier = () -> {
+                try {
+                    return Files.lines(Paths.get(pathToFile));
+                } catch (IOException e) {
+                    return null;
+                }
+            };
+            src = supplier.get().collect(Collectors.toCollection(ArrayList::new));
+            supplier.get().forEach(writer::println);
+            return src;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    private static String[] split(String string) {
+        return string.split(",");
+    }
+
+    private static Country createCountry(String[] stringArray) {
+        Country country = new Country();
+        LinkedHashMap<Integer, Integer> population = new LinkedHashMap<>();
+        Integer year = beginYear;
+        for (String element : stringArray) {
+            if (isParsable(element)) {
+                population.put(year, Integer.parseInt(element));
+                year++;
+            }
+        }
+
+        if (!population.isEmpty()) {
+            country.setName(stringArray[0].substring(1));
+            country.setPopulation(population);
+            return country;
+        }
+        return null;
+    }
+
+    private static boolean isParsable(String input) {
+        boolean parsable = true;
+        try {
+            Integer.parseInt(input);
+        } catch (NumberFormatException e) {
+            parsable = false;
+        }
+        return parsable;
+    }
+
+    static ArrayList<Country> createCountriesList(ArrayList<String> sourceList) {
+        return sourceList.stream()
+                .map(string -> createCountry(split(string)))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(ArrayList::new));
+    }
+
+    static ArrayList<Country> peekTopCountries(ArrayList<Country> countries) {
+        ArrayList<Country> topCountries = new ArrayList<>();
+        ArrayList<Country> countriesCopy = new ArrayList<>(countries);
+        for (int i = 0; i < 5; i++) {
+            topCountries.add(returnTopCountry(countriesCopy));
+        }
+        return topCountries;
+    }
+
+    private static Country returnTopCountry(ArrayList<Country> countriesCopy) {
+        double maxChange = Integer.MIN_VALUE;
+        Country currTopCountry = countriesCopy.get(0);
+        for (Country country : countriesCopy) {
+            double currChange = calculateAverageChangePopulation(country.getPopulation());
+            if (currChange > maxChange) {
+                maxChange = currChange;
+                currTopCountry = country;
+            }
+        }
+
+        currTopCountry.setChangePopulation(maxChange);
+        countriesCopy.remove(currTopCountry);
+        return currTopCountry;
+    }
+
+    private static double calculateAverageChangePopulation(LinkedHashMap<Integer, Integer> population) {
+        Iterator<Map.Entry<Integer, Integer>> it = population.entrySet().iterator();
+        Map.Entry<Integer, Integer> prev = it.next();
+        ArrayList<Double> changes = new ArrayList<>();
+        while (it.hasNext()) {
+            Map.Entry<Integer, Integer> curr = it.next();
+            Double changePercent = (curr.getValue() * 100.0) / prev.getValue() - 100;
+            changes.add(changePercent);
+            prev = curr;
+        }
+
+        return Math.round(calculateSumOfPercents(changes) / population.size() * 100.0) / 100D;
+    }
+
+    private static double calculateSumOfPercents(ArrayList<Double> changes) {
+        double sum = 0;
+        for (Double percent : changes) {
+            sum += percent;
+        }
+        return sum;
+    }
+
+    static int predict(Country country) {
+        return (int) ((100 + country.getChangePopulation()) * country.getPopulation().get(2016) / 100);
+    }
+
+    static void deleteFile() {
+        file.delete();
+    }
+}
